@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Espelhamento OBS - KBS TV</title>
+    <style>
+        body, html { margin: 0; padding: 0; background: transparent; overflow: hidden; height: 100%; width: 100%; }
+        video, iframe { width: 100vw; height: 100vh; border: none; background: #000; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+    <video id="v" autoplay playsinline></video>
+    <iframe id="yt" allow="autoplay; encrypted-media" frameborder="0" style="display:none"></iframe>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBzzQg4fMWQm82aOu2xM2huVPvHeyitFxQ",
+            authDomain: "controle-remoto-da345.firebaseapp.com",
+            databaseURL: "https://controle-remoto-da345-default-rtdb.firebaseio.com",
+            projectId: "controle-remoto-da345",
+            storageBucket: "controle-remoto-da345.firebasestorage.app",
+            messagingSenderId: "246457543992",
+            appId: "1:246457543992:web:41bf1bd64a4788fb2625cd"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const video = document.getElementById('v');
+        const yt = document.getElementById('yt');
+        let hlsInstance = null;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const uid = urlParams.get('user');
+
+        if (uid) {
+            onValue(ref(db, `usuarios/${uid}/status_obs`), (snapshot) => {
+                const data = snapshot.val();
+                if (!data) return;
+
+                if (data.tipo === 'youtube') {
+                    video.style.display = 'none';
+                    yt.style.display = 'block';
+                    const ytId = data.url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([A-Za-z0-9_-]{11})/);
+                    if (ytId && !yt.src.includes(ytId[1])) {
+                        yt.src = `https://www.youtube.com/embed/${ytId[1]}?autoplay=1&mute=0`;
+                    }
+                } else {
+                    yt.style.display = 'none';
+                    video.style.display = 'block';
+                    
+                    if (video.src !== data.url && !data.url.includes('.m3u8')) {
+                        video.src = data.url;
+                    } else if (data.url.includes('.m3u8')) {
+                        if (!hlsInstance) {
+                            hlsInstance = new Hls();
+                            hlsInstance.loadSource(data.url);
+                            hlsInstance.attachMedia(video);
+                        }
+                    }
+
+                    if (Math.abs(video.currentTime - data.tempo) > 3) {
+                        video.currentTime = data.tempo;
+                    }
+                    if (data.playing) video.play().catch(() => {}); else video.pause();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
